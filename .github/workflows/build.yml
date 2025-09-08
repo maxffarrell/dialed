@@ -1,0 +1,83 @@
+name: Build (Arduino CLI)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        fqbn:
+          - esp32:esp32:esp32
+          - esp32:esp32:esp32s3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v1
+        with:
+          version: latest
+
+      - name: Configure Arduino CLI
+        run: |
+          arduino-cli config init
+          arduino-cli config set library.enable_unsafe_install true
+
+      - name: Install ESP32 core
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
+
+      - name: Cache Arduino deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.arduino15
+            ~/Arduino/libraries
+          key: ${{ runner.os }}-arduino-${{ hashFiles('**/*.ino', '**/library.properties', '.github/workflows/build.yml') }}
+
+      - name: Install libraries
+        run: |
+          arduino-cli lib install "U8g2"
+
+      # Optional: generate Geist Mono U8g2 fonts at build time (safe to remove if you commit fonts/*.c/*.h)
+      - name: Generate Geist Mono fonts
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y git build-essential curl unzip otf2bdf
+          test -d u8g2 || git clone https://github.com/olikraus/u8g2.git
+          make -C u8g2/tools/font/bdfconv
+          mkdir -p src/fonts
+          curl -fL -o /tmp/GeistMono.zip https://github.com/vercel/geist-font/releases/latest/download/GeistMono.zip
+          unzip -o /tmp/GeistMono.zip -d /tmp/geistmono
+          TTF="$(find /tmp/geistmono -type f -iname "GeistMono-Regular*.ttf" | head -n1)"
+          if [ -z "$TTF" ]; then echo "No GeistMono-Regular TTF found"; exit 1; fi
+          cp "$TTF" src/fonts/GeistMono-Regular.ttf
+          otf2bdf -r 72 -p 32 src/fonts/GeistMono-Regular.ttf > src/fonts/GeistMono-32.bdf
+          otf2bdf -r 72 -p 12 src/fonts/GeistMono-Regular.ttf > src/fonts/GeistMono-12.bdf
+          u8g2/tools/font/bdfconv/bdfconv -f 1 -m '32-127' -n u8g2_font_geistmono32_tf -o src/fonts/geistmono_32_tf.c src/fonts/GeistMono-32.bdf
+          u8g2/tools/font/bdfconv/bdfconv -f 1 -m '32-127' -n u8g2_font_geistmono12_tf -o src/fonts/geistmono_12_tf.c src/fonts/GeistMono-12.bdf
+          printf '#pragma once\nextern const uint8_t u8g2_font_geistmono32_tf[] U8G2_FONT_SECTION("u8g2_font_geistmono32_tf");\n' > src/fonts/geistmono_32_tf.h
+          printf '#pragma once\nextern const uint8_t u8g2_font_geistmono12_tf[] U8G2_FONT_SECTION("u8g2_font_geistmono12_tf");\n' > src/fonts/geistmono_12_tf.h
+
+      - name: Compile (${{ matrix.fqbn }})
+        run: |
+          arduino-cli compile --fqbn ${{ matrix.fqbn }} src
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.fqbn }}
+          path: |
+            ./src/*.ino.*
+            ./build/*/*.bin
+          if-no-files-found: warn
