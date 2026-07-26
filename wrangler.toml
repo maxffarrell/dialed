@@ -1,0 +1,16 @@
+name = "dialed-watch"
+main = ".svelte-kit/cloudflare/_worker.js"
+compatibility_date = "2026-07-26"
+
+[assets]
+directory = ".svelte-kit/cloudflare"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dialed"
+database_id = "replace-with-cloudflare-d1-id"
+
+[vars]
+PUBLIC_MOCK_MODE = "true"
+PARAKEET_MODEL = "nvidia/parakeet-tdt-0.6b-v3"
