@@ -12,5 +12,6 @@ database_name = "dialed"
 database_id = "replace-with-cloudflare-d1-id"
 
 [vars]
-PUBLIC_MOCK_MODE = "true"
+PUBLIC_MOCK_MODE = "false"
+PARAKEET_API_URL = "https://openrouter.ai/api/v1/audio/transcriptions"
 PARAKEET_MODEL = "nvidia/parakeet-tdt-0.6b-v3"

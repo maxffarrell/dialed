@@ -3,23 +3,36 @@ import type { RequestHandler } from './$types';
 
 const mockTranscript = 'The next step should feel obvious when I look at the watch.';
 
+function audioFormat(file: File) {
+  const extension = file.name.split('.').pop()?.toLowerCase();
+  if (extension && ['wav', 'mp3', 'flac', 'm4a', 'ogg', 'webm', 'aac'].includes(extension)) return extension;
+  if (file.type.includes('wav')) return 'wav';
+  if (file.type.includes('mpeg') || file.type.includes('mp3')) return 'mp3';
+  if (file.type.includes('ogg')) return 'ogg';
+  return 'webm';
+}
+
 async function transcribeAudio(request: Request, env: App.Platform['env']) {
   const form = await request.formData();
   const audio = form.get('file') ?? form.get('audio');
   if (!(audio instanceof File)) return { error: 'an audio file is required' as const };
 
-  const endpoint = env?.PARAKEET_API_URL;
-  if (!endpoint) {
-    if (env?.PUBLIC_MOCK_MODE !== 'false') return { text: mockTranscript };
-    return { error: 'PARAKEET_API_URL is not configured' as const };
-  }
+  const endpoint = env?.PARAKEET_API_URL || 'https://openrouter.ai/api/v1/audio/transcriptions';
+  if (env?.PUBLIC_MOCK_MODE !== 'false' && !env?.PARAKEET_API_KEY) return { text: mockTranscript };
 
-  const body = new FormData();
-  body.append('file', audio, audio.name || 'voice-note.webm');
-  body.append('model', env?.PARAKEET_MODEL || 'nvidia/parakeet-tdt-0.6b-v3');
-  body.append('response_format', 'json');
+  const bytes = new Uint8Array(await audio.arrayBuffer());
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  const body = JSON.stringify({
+    model: env?.PARAKEET_MODEL || 'nvidia/parakeet-tdt-0.6b-v3',
+    input_audio: { data: btoa(binary), format: audioFormat(audio) }
+  });
 
   const headers = new Headers();
+  headers.set('Content-Type', 'application/json');
   if (env?.PARAKEET_API_KEY) headers.set('Authorization', `Bearer ${env.PARAKEET_API_KEY}`);
   const response = await fetch(endpoint, { method: 'POST', headers, body });
   if (!response.ok) return { error: `Parakeet request failed (${response.status})` as const };
