@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { initialNotes, makeWatchState } from '$lib/mock-data';
-  import { completeTask, formatDuration, orderedTasks } from '$lib/watch';
-  import type { Note, Task, WatchState } from '$lib/types';
+  import { initialNotes, makeWatchState } from '#lib/mock-data.js';
+  import { completeTask, formatDuration, orderedTasks } from '#lib/watch.js';
+  import type { Note, Task, WatchState } from '#lib/types.js';
 
   let state: WatchState = makeWatchState();
   let notes: Note[] = initialNotes;

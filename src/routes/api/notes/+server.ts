@@ -1,4 +1,4 @@
-import { json } from '@sveltejs/kit';
+
 import type { RequestHandler } from './$types';
 
 const mockTranscript = 'The next step should feel obvious when I look at the watch.';
@@ -46,17 +46,17 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   if (request.headers.get('content-type')?.includes('multipart/form-data')) {
     try {
       const result = await transcribeAudio(request, platform?.env);
-      if ('error' in result) return json({ error: result.error }, { status: 400 });
+      if ('error' in result) return Response.json({ error: result.error }, { status: 400 });
       transcript = result.text;
     } catch (error) {
       console.error('Parakeet transcription failed', error);
-      return json({ error: 'voice note transcription failed' }, { status: 502 });
+      return Response.json({ error: 'voice note transcription failed' }, { status: 502 });
     }
   } else {
     const body = (await request.json()) as { transcript?: string };
     transcript = body.transcript?.trim();
   }
-  if (!transcript) return json({ error: 'transcript or audio file is required' }, { status: 400 });
+  if (!transcript) return Response.json({ error: 'transcript or audio file is required' }, { status: 400 });
   const note = {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
@@ -68,5 +68,5 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     await db.prepare('INSERT INTO notes (id, user_id, transcript, context) VALUES (?, ?, ?, ?)')
       .bind(note.id, 'demo-user', note.transcript, note.context).run();
   }
-  return json(note, { status: 201 });
+  return Response.json(note, { status: 201 });
 };

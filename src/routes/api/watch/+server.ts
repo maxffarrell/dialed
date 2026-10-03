@@ -1,18 +1,18 @@
-import { json } from '@sveltejs/kit';
-import { makeWatchState } from '$lib/mock-data';
+
+import { makeWatchState } from '#lib/mock-data.js';
 import type { RequestHandler } from './$types';
-import type { Task, WatchState } from '$lib/types';
+import type { Task, WatchState } from '#lib/types.js';
 
 let mockState: WatchState = makeWatchState();
 
 export const GET: RequestHandler = async ({ platform }) => {
   const db = platform?.env?.DB as D1Database | undefined;
-  if (!db) return json(mockState);
+  if (!db) return Response.json(mockState);
 
   const rows = await db.prepare(
     'SELECT id, title, duration_minutes as durationMinutes, completed FROM tasks WHERE user_id = ? ORDER BY duration_minutes DESC'
   ).bind('demo-user').all<Task>();
-  return json({ ...mockState, tasks: rows.results });
+  return Response.json({ ...mockState, tasks: rows.results });
 };
 
 export const PUT: RequestHandler = async ({ request, platform }) => {
@@ -25,5 +25,5 @@ export const PUT: RequestHandler = async ({ request, platform }) => {
         .bind(task.completed ? 1 : 0, task.id, 'demo-user').run();
     }
   }
-  return json(mockState);
+  return Response.json(mockState);
 };
